@@ -15,29 +15,41 @@ class ViewController: UIViewController ,UICollectionViewDataSource,UICollectionV
     var images = [UIImage]()
     let page = 10
     var beginIndex = 0
-
+    
     var endIndex = 9
     var allPhotos : PHFetchResult<PHAsset>?
     var loading = false
     var hasNextPage = false
     
     var photoSize:CGSize {
-        let width = UIScreen.main.bounds.size.width/4.0
+        let width = (UIScreen.main.bounds.size.width - 6.0)/4.0
         return CGSize(width:width,height: width)
     }
-
+    
     @IBOutlet weak var collectionView : UICollectionView!
-
-
+    
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        let options = PHFetchOptions()
-        options.includeHiddenAssets = true
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        allPhotos = PHAsset.fetchAssets(with: .image, options: options)
-        getImages()
+        
+        
+        PHPhotoLibrary.requestAuthorization({
+            (status) in
+            switch status {
+            case .authorized:
+                let options = PHFetchOptions()
+                options.includeHiddenAssets = true
+                options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                self.allPhotos = PHAsset.fetchAssets(with: .image, options: options)
+                self.getImages()
+            default:
+                break
+                
+            }
+        })
+        
     }
-
+    
     func getImages(){
         endIndex = beginIndex + (page - 1)
         if endIndex > allPhotos!.count {
@@ -49,25 +61,25 @@ class ViewController: UIViewController ,UICollectionViewDataSource,UICollectionV
             fetchPhotos(indexSet: indexSet)
         }
     }
-
-
+    
+    
     fileprivate func fetchPhotos(indexSet: IndexSet) {
-
+        
         if allPhotos!.count == self.images.count {
             self.hasNextPage = false
             self.loading = false
             return
         }
-
+        
         self.loading = true
-
+        
         DispatchQueue.global(qos: .background).async { [weak self] in
+           
             self?.allPhotos?.enumerateObjects(at: indexSet, options: NSEnumerationOptions.concurrent, using: { (asset, count, stop) in
-
                 guard let weakSelf = self else {
                     return
                 }
-
+                
                 let imageManager = PHImageManager.default()
                 let targetSize = CGSize(width:150,height: 150)
                 let options = PHImageRequestOptions()
@@ -77,7 +89,7 @@ class ViewController: UIViewController ,UICollectionViewDataSource,UICollectionV
                         weakSelf.images.append(image)
                         weakSelf.assets.append(asset)
                     }
-
+                    
                 })
                 if weakSelf.images.count - 1 == indexSet.last! {
                     print("last element")
@@ -91,36 +103,35 @@ class ViewController: UIViewController ,UICollectionViewDataSource,UICollectionV
             })
         }
     }
-
+    
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         return 1
     }
-
+    
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return images.count
     }
-
+    
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "photoCelll", for: indexPath)
         let imgView = cell.viewWithTag(1) as! UIImageView
         imgView.image = self.images[indexPath.row]
-
+        
         if self.hasNextPage && !loading && indexPath.row == self.images.count - 1 {
             getImages()
         }
-
+        
         return cell
     }
-
+    
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let asset = self.assets[indexPath.row]
-        let imageManager = PHImageManager.default()
-        let targetSize = CGSize(width:400,height: 400)
-        let options = PHImageRequestOptions()
-        options.isSynchronous = true
-        imageManager.requestImage(for: asset, targetSize: targetSize, contentMode: .aspectFit, options: options, resultHandler: { (image, info) in
-            print(image)
-        })
+        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+        if let vc = storyboard.instantiateViewController(identifier: "FullViewController") as? FullViewController {
+            vc.asset = asset
+            self.navigationController?.pushViewController(vc, animated: true)
+        }
+        
     }
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         return photoSize
